@@ -18,6 +18,7 @@ use crate::engine::{
 use glam::Vec3;
 use rand::Rng;
 use tokio::sync::Mutex;
+use tokio::task;
 
 #[derive(Clone, Copy)]
 pub struct Camera {
@@ -48,26 +49,38 @@ impl Camera {
         }
     }
 
-    pub fn render(&mut self, world: &dyn Hittable) {
+    pub async fn render(&mut self, world: Arc<dyn Hittable>) {
         self.initialize();
 
-        let bar = indicatif::ProgressBar::new(self.width as u64 * self.height as u64);
-
-        let mut contents: Vec<Vec<String>> = Vec::new();
+        let bar = indicatif::ProgressBar::new(self.height as u64);
+        let mut handles = Vec::new();
 
         for j in 0..self.height {
-            let mut inner: Vec<String> = Vec::new();
-            for i in 0..self.width {
-                let mut pixel_color = vec3(0.0);
-                for _ in 0..self.samples_per_pixel {
-                    // sample
-                    let r = self.get_ray(i, j);
-                    pixel_color += self.ray_color(&r, 0, world);
-                }
-                inner.push(write_color(pixel_color, self.samples_per_pixel));
-                bar.inc(1);
+            let cam = Arc::new(*self);
+            {
+                let world_clone = world.clone();
+                let cam_clone = cam.clone();
+                let handle = task::spawn(async move {
+                    let mut inner: Vec<String> = Vec::new();
+                    for i in 0..cam_clone.width {
+                        let mut pixel_color = vec3(0.0);
+                        for _ in 0..cam_clone.samples_per_pixel {
+                            let r = cam_clone.get_ray(i, j);
+                            pixel_color += cam_clone.ray_color(&r, 0, &*world_clone);
+                        }
+                        inner.push(write_color(pixel_color, cam_clone.samples_per_pixel));
+                    }
+                    return inner;
+                });
+                handles.push(handle);
             }
-            contents.insert(j as usize, inner);
+        }
+
+        let mut contents: Vec<Vec<String>> = Vec::new();
+        for handle in handles {
+            let color = handle.await.unwrap();
+            bar.inc(1);
+            contents.push(color);
         }
 
         let mut file = File::create("main.ppm").unwrap();

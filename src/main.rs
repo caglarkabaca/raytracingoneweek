@@ -18,5 +18,5 @@ async fn main() {
     world.add(Box::new(Sphere::new(&Point::new(0.0, -100.5, -1.0), 100.0)));
 
     let mut camera = Camera::new(1.0 / 1.0, 500, 100, 50);
-    camera.render(&world);
+    camera.render(Arc::new(world)).await;
 }
