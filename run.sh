@@ -1,0 +1,1 @@
+rm main.ppm && RUST_LOG=debug cargo run && open main.ppm 
