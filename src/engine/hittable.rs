@@ -6,12 +6,15 @@ use crate::engine::utils::*;
 use crate::engine::vec3;
 use crate::engine::vec3::vec3;
 
-#[derive(Clone, Copy)]
+use super::material::Material;
+
+#[derive(Clone)]
 pub struct HitRecord {
     pub p: Point,
     normal: Vec3,
+    pub mat: Option<Box<dyn Material>>,
     t: f32,
-    front_face: bool,
+    pub front_face: bool,
 }
 
 impl HitRecord {
@@ -19,13 +22,14 @@ impl HitRecord {
         HitRecord {
             p: vec3(0.0),
             normal: vec3(0.0),
+            mat: None,
             t: 0.0,
             front_face: false,
         }
     }
 
     pub fn normal(&self) -> Vec3 {
-        self.normal
+        self.normal.normalize()
     }
 
     pub fn set_face_normal(&mut self, ray: &Ray, outward_normal: &Vec3) {
@@ -81,13 +85,15 @@ impl Hittable for HittableList {
 pub struct Sphere {
     center: Point,
     radius: f32,
+    mat: Box<dyn Material>,
 }
 
 impl Sphere {
-    pub fn new(_center: &Point, _radius: f32) -> Sphere {
+    pub fn new(_center: &Point, _radius: f32, _mat: Box<dyn Material>) -> Sphere {
         Sphere {
             center: _center.clone(),
             radius: _radius,
+            mat: _mat.clone(),
         }
     }
 }
@@ -114,6 +120,7 @@ impl Hittable for Sphere {
 
         rec.t = root;
         rec.p = ray.at(rec.t);
+        rec.mat = Some(self.mat.clone());
         let outward_normal = (rec.p - self.center) / self.radius;
         rec.set_face_normal(ray, &outward_normal);
 

@@ -2,6 +2,7 @@ use glam::*;
 
 pub type Point = Vec3;
 
+#[derive(Clone)]
 pub struct Ray {
     orig: Point,
     dir: Vec3,

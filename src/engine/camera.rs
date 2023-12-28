@@ -52,9 +52,7 @@ impl Camera {
     pub async fn render(&mut self, world: Arc<dyn Hittable>) {
         self.initialize();
 
-        let bar = indicatif::ProgressBar::new(self.height as u64);
         let mut handles = Vec::new();
-
         for j in 0..self.height {
             let cam = Arc::new(*self);
             {
@@ -76,12 +74,14 @@ impl Camera {
             }
         }
 
+        let bar = indicatif::ProgressBar::new(handles.len() as u64);
         let mut contents: Vec<Vec<String>> = Vec::new();
         for handle in handles {
             let color = handle.await.unwrap();
             bar.inc(1);
             contents.push(color);
         }
+        bar.finish_with_message("done");
 
         let mut file = File::create("main.ppm").unwrap();
         file.write(
@@ -96,8 +96,6 @@ impl Camera {
             }
             file.write(b"\n").unwrap();
         }
-
-        bar.finish_with_message("done");
     }
 
     fn initialize(&mut self) {
@@ -129,8 +127,17 @@ impl Camera {
 
         let mut rec = HitRecord::new();
         if world.hit(r, &Interval::with(0.001, f32::INFINITY), &mut rec) {
-            let direction = random_on_hemisphere(rec.normal());
-            return 0.5 * self.ray_color(&Ray::new(rec.p, direction), depth + 1, world);
+            let mut scattered = Ray::new_null();
+            let mut attenuation = vec3(0.0);
+
+            let _rec = rec.clone();
+            let mat = _rec.mat.unwrap().clone();
+
+            if mat.scatter(r, &rec, &mut attenuation, &mut scattered) {
+                return attenuation * self.ray_color(&scattered, depth + 1, world);
+            }
+
+            return vec3(0.0);
         }
 
         let unit_direction = r.direction().normalize();
